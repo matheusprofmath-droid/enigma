@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trilha dos Enigmas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Baloo+2:wght@500;700;800&display=swap">
+<style>
+[hidden]{display:none!important}
+*,*::before,*::after{box-sizing:border-box}
+/* Mesa de jogo de tabuleiro (single dark look): feltro verde-musgo, casas de papel creme, peões nas cores clássicas; carta-enigma no centro, salas à direita */
+:root{
+  --felt:#123a2e; --felt2:#0c2a21; --wood:#5a3a22; --paper:#fbf3dc; --paper2:#f1e3bd; --ink:#2a1d10; --light:#f6f1e4; --muted:#b9cbbf;
+  --gold:#ffcf4a; --ok:#35d07f; --bad:#ff5d5d;
+  --sA:#ff5d5d; --sB:#4d8dff; --sC:#ffc93c; --sD:#3ccf7a;
+  --mat:#ff7a59; --cie:#2dd4bf; --por:#b48cff;
+  --display:"Luckiest Guy","Arial Black",Impact,sans-serif;
+  --body:"Baloo 2","Segoe UI",Arial,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(ellipse at 50% 30%,var(--felt),var(--felt2) 75%);background-color:var(--felt2);color:var(--light);font-family:var(--body);overflow:hidden;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.18;
+  background-image:radial-gradient(rgba(255,255,255,.15) 1px,transparent 1px);background-size:5px 5px}
+button{font-family:inherit;cursor:pointer;color:inherit}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:4px solid var(--gold);outline-offset:3px}
+.app{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;gap:10px;padding-block:10px}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{font-family:var(--display);font-size:clamp(20px,2vw,32px);color:var(--gold);letter-spacing:.03em;text-shadow:0 3px 0 rgba(0,0,0,.35)}
+.clock{display:flex;align-items:center;gap:10px}
+.clock b{font-family:var(--display);font-weight:400;font-size:clamp(26px,2.6vw,42px);font-variant-numeric:tabular-nums;color:var(--light);min-width:4.2ch;text-align:center}
+.clock b.low{color:var(--bad)}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.tool{background:rgba(0,0,0,.25);border:2px solid rgba(255,255,255,.25);border-radius:999px;padding:7px 15px;font-size:clamp(14px,1.05vw,18px);font-weight:700;text-decoration:none;color:var(--light);display:inline-flex;align-items:center}
+.tool:hover{border-color:var(--gold)}
+
+.game{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,24vw);gap:14px}
+.left{min-width:0;min-height:0;display:flex;flex-direction:column;gap:12px}
+
+/* tabuleiro */
+.board{background:linear-gradient(#6b4529,var(--wood));border-radius:22px;padding:10px;box-shadow:inset 0 0 0 4px rgba(0,0,0,.25),0 10px 30px rgba(0,0,0,.35)}
+.track{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:6px;height:clamp(170px,27vh,260px)}
+.casa{position:relative;background:var(--paper);color:var(--ink);border-radius:12px;display:flex;flex-direction:column;justify-content:space-between;padding:4px 7px;min-width:0;box-shadow:inset 0 -4px 0 var(--paper2)}
+.casa .num{font-family:var(--display);font-size:clamp(13px,1.1vw,18px);opacity:.55}
+.casa .esp{position:absolute;right:6px;top:3px;font-size:clamp(14px,1.4vw,24px)}
+.casa.bonus{background:#e6f7d9}.casa.buraco{background:#f3d6cf}.casa.surpresa{background:#e7dcff}
+.casa.start,.casa.end{background:var(--gold)}
+.casa.start .num,.casa.end .num{opacity:1;font-size:clamp(12px,1vw,17px)}
+.casa .tip{font-size:clamp(10px,.8vw,13px);font-weight:800;line-height:1;opacity:.7}
+.peoes{display:flex;flex-wrap:wrap;gap:3px;align-self:flex-end}
+.peao{width:clamp(16px,1.6vw,26px);height:clamp(16px,1.6vw,26px);border-radius:50% 50% 45% 45%;border:3px solid rgba(0,0,0,.45);box-shadow:0 3px 0 rgba(0,0,0,.35);transition:transform .2s}
+.peao.hop{animation:hop .28s ease}
+@keyframes hop{50%{transform:translateY(-12px) scale(1.1)}}
+
+/* carta enigma */
+.enigma{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);background:var(--paper);color:var(--ink);border-radius:26px;padding:clamp(14px,1.8vw,26px);
+  box-shadow:0 14px 0 var(--paper2),0 20px 40px rgba(0,0,0,.4);overflow:auto;gap:10px;align-content:start;border:6px solid var(--ink)}
+.enigma.MAT{border-color:var(--mat)}.enigma.CIE{border-color:var(--cie)}.enigma.POR{border-color:var(--por)}
+.ehead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:space-between}
+.etitle{font-family:var(--display);font-size:clamp(30px,3.2vw,54px);line-height:1;color:var(--ink)}
+.tag{font-family:var(--display);font-size:clamp(16px,1.5vw,24px);padding:4px 16px;border-radius:999px;color:#14102a}
+.tag.MAT{background:var(--mat)}.tag.CIE{background:var(--cie)}.tag.POR{background:var(--por)}
+.ecount{font-weight:800;font-size:clamp(15px,1.2vw,20px);opacity:.7}
+.dicas{display:flex;flex-direction:column;gap:8px}
+.dica{display:flex;gap:14px;align-items:center;background:#fff;border-radius:16px;padding:10px 16px;font-size:clamp(21px,2.2vw,36px);font-weight:700;line-height:1.2;animation:flip .45s ease both;border:3px solid var(--paper2)}
+.dica .nd{flex:none;font-family:var(--display);font-size:.8em;background:var(--ink);color:var(--paper);border-radius:12px;padding:4px 10px;text-align:center;line-height:1.1}
+.dica .nd small{display:block;font-family:var(--body);font-size:.5em;font-weight:800}
+.dica.lock{background:transparent;border:3px dashed rgba(42,29,16,.3);color:rgba(42,29,16,.45);animation:none;font-size:clamp(17px,1.6vw,26px)}
+.dica.lock .nd{background:rgba(42,29,16,.25)}
+@keyframes flip{from{transform:rotateX(80deg);opacity:0}}
+.resp{font-family:var(--display);font-size:clamp(30px,3.4vw,58px);text-align:center;color:var(--ink);animation:pop .6s cubic-bezier(.2,1.6,.4,1) both}
+.resp small{display:block;font-family:var(--body);font-size:.4em;font-weight:800;opacity:.7}
+@keyframes pop{from{transform:scale(.4);opacity:0}}
+.ctrl{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.btn{font-family:var(--display);font-size:clamp(17px,1.5vw,26px);border-radius:999px;padding:10px 24px;border:0;background:var(--gold);color:#2a1d10;box-shadow:0 5px 0 #9a6a00}
+.btn:active{transform:translateY(3px);box-shadow:0 2px 0 #9a6a00}
+.btn.ghost{background:transparent;border:3px solid currentColor;box-shadow:none}
+.btn.dark{background:var(--ink);color:var(--paper);box-shadow:0 5px 0 #000}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.intro{text-align:center;display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;padding:10px}
+.intro p{margin:0;font-size:clamp(18px,1.7vw,28px);font-weight:700;max-width:46ch}
+
+/* salas */
+.salas{min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px;overflow:auto}
+.sala{background:rgba(0,0,0,.28);border:3px solid var(--c);border-radius:18px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.sala.fora{opacity:.45}
+.sala.vez{box-shadow:0 0 0 4px var(--gold)}
+.shead{display:flex;align-items:center;gap:10px}
+.shead .peao{flex:none;background:var(--c)}
+.shead b{font-family:var(--display);font-weight:400;font-size:clamp(20px,1.8vw,30px);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shead span{font-weight:800;font-size:clamp(15px,1.2vw,20px);color:var(--muted);white-space:nowrap}
+.sact{display:flex;gap:8px}
+.sact button{flex:1;border:0;border-radius:12px;padding:8px 6px;font-weight:800;font-size:clamp(15px,1.2vw,20px)}
+.ok{background:var(--ok);color:#06331b}.no{background:var(--bad);color:#3b0606}
+.sact button:disabled{opacity:.3;cursor:not-allowed}
+.mao{display:flex;gap:6px;flex-wrap:wrap;min-height:34px;align-items:center}
+.mao .vazio{font-size:14px;color:var(--muted);font-weight:700}
+.poder{display:inline-flex;align-items:center;gap:4px;background:var(--paper);color:var(--ink);border:0;border-radius:10px;padding:4px 10px;font-weight:800;font-size:clamp(13px,1.05vw,17px);box-shadow:0 3px 0 var(--paper2)}
+.poder.passivo{cursor:default;background:#e8eef9}
+.poder:not(.passivo):hover{transform:translateY(-2px)}
+
+/* overlay */
+.overlay{position:fixed;inset:0;z-index:20;background:rgba(4,16,12,.82);display:grid;place-items:center;padding:16px;animation:fade .2s both}
+@keyframes fade{from{opacity:0}}
+.modal{background:var(--paper);color:var(--ink);border:6px solid var(--ink);border-radius:26px;padding:clamp(18px,2.6vw,36px);width:min(860px,100%);max-height:100%;overflow:auto;
+  display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center}
+.modal h2{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(28px,3vw,50px);line-height:1.05}
+.modal p{margin:0;font-size:clamp(18px,1.7vw,28px);font-weight:700;line-height:1.35}
+.modal .actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.bigicon{font-size:clamp(60px,7vw,110px);line-height:1}
+.alvos{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.alvo{border:4px solid var(--c);background:#fff;border-radius:16px;padding:10px 18px;font-family:var(--display);font-size:clamp(20px,1.8vw,30px);color:var(--ink)}
+.rank{display:flex;flex-direction:column;gap:8px;width:100%}
+.rrow{display:grid;grid-template-columns:3ch auto minmax(0,1fr) auto;gap:14px;align-items:center;background:#fff;border:4px solid var(--c);border-radius:16px;padding:8px 16px;font-size:clamp(20px,2vw,32px);font-weight:800;text-align:left}
+.rrow .pos{font-family:var(--display);font-weight:400}
+.rrow .peao{background:var(--c)}
+.cfg{display:flex;flex-direction:column;gap:14px;width:100%;text-align:left}
+.cfg fieldset{border:3px solid var(--paper2);border-radius:16px;padding:12px;margin:0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.cfg legend{font-weight:800;padding:0 6px;font-size:18px}
+.cfg input{background:#fff;border:2px solid var(--paper2);border-radius:10px;color:var(--ink);font:700 18px var(--body);padding:6px 10px;width:8em;max-width:100%}
+.cfg .note{flex-basis:100%;font-size:15px;opacity:.75;font-weight:700}
+.small{font-family:var(--body);font-weight:800;font-size:16px;border-radius:999px;padding:7px 16px;border:2px solid var(--ink);background:none;color:var(--ink)}
+.small[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.small.danger{border-color:#b42318;color:#b42318}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:25;background:var(--ink);color:var(--paper);border:3px solid var(--gold);border-radius:999px;
+  padding:10px 24px;font-weight:800;font-size:clamp(17px,1.6vw,26px);animation:fade .2s both;max-width:calc(100% - 32px);text-align:center}
+canvas#confetti{position:fixed;inset:0;z-index:30;pointer-events:none}
+
+/* gabarito do professor */
+.prof{max-width:900px;margin:0 auto;padding-block:24px;display:flex;flex-direction:column;gap:16px}
+.prof .aviso{background:var(--bad);color:#fff;border-radius:14px;padding:10px 16px;font-weight:800;font-size:18px}
+.prof .box{background:var(--paper);color:var(--ink);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:10px}
+.prof .box h2{margin:0;font-family:var(--display);font-weight:400;font-size:clamp(32px,4vw,60px)}
+.prof .box p{margin:0;font-size:20px;font-weight:700}
+.prof ol{margin:0;padding-left:1.4em;font-size:19px;font-weight:600}
+
+@media (max-width:900px){
+  body{overflow:auto}
+  .game{grid-template-columns:1fr}
+  .track{height:auto;grid-template-rows:none;grid-auto-rows:64px}
+  .salas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+
+
+<div class="app" id="app">
+  <div class="top">
+    <div class="brand">🎲 Trilha dos Enigmas</div>
+    <div class="clock"><b id="relogio">40:00</b><button class="tool" id="btnPausa">⏸ Pausar</button></div>
+    <div class="tools">
+      <button class="tool" id="btnSom" aria-pressed="true">🔊 Som</button>
+      <a class="tool" id="lnkProf" href="#professor" target="_blank" rel="noopener">🔒 Gabarito</a>
+      <button class="tool" id="btnTela">⛶ Tela cheia</button>
+      <button class="tool" id="btnCfg">⚙ Ajustes</button>
+    </div>
+  </div>
+  <div class="game">
+    <div class="left">
+      <div class="board"><div class="track" id="track"></div></div>
+      <div class="enigma" id="enigma"></div>
+    </div>
+    <aside class="salas" id="salas" aria-label="Salas"></aside>
+  </div>
+</div>
+<div id="profView" class="prof" hidden></div>
+<div id="overlay"></div>
+<div id="toastBox"></div>
+<canvas id="confetti"></canvas>
+
+<script>
+// Trilha dos Enigmas — cartas "Quem Sou Eu?" — 6º ano — Dia 1
+// [matéria, resposta, [dica 1 (difícil), dica 2, dica 3 (fácil)], respostas aceitas]
+const CARTAS_RAW = [
+// ===== MATEMÁTICA =====
+["MAT","Frações equivalentes",["Somos escritas de jeitos diferentes, mas valemos a mesma coisa.","Para nos encontrar, multiplique o numerador e o denominador pelo mesmo número.","1/2 e 2/4 são exemplos de nós."],"frações equivalentes; fração equivalente"],
+["MAT","Denominador",["Faço parte de toda fração.","Digo em quantas partes iguais o inteiro foi dividido.","Em 3/5, eu sou o 5."],"denominador"],
+["MAT","Octógono",["Sou um polígono.","Tenho 8 lados e 8 vértices.","A placa de trânsito PARE tem a minha forma."],"octógono"],
+["MAT","Cubo",["Sou um sólido geométrico.","Tenho 6 faces, 12 arestas e 8 vértices.","Todas as minhas faces são quadrados, como em um dado."],"cubo; hexaedro"],
+["MAT","Triângulo equilátero",["Sou um polígono de 3 lados.","Todos os meus ângulos medem 60°.","Meus três lados têm a mesma medida."],"triângulo equilátero; equilátero"],
+["MAT","Perímetro",["Sou uma medida de comprimento.","Para me calcular, some as medidas de todos os lados da figura.","Sou o tamanho do contorno de uma figura, como a cerca em volta de um terreno."],"perímetro"],
+["MAT","Área",["Posso ser medida em cm² ou em m².","No retângulo, me calculo multiplicando o comprimento pela largura.","Sou o tamanho da superfície de uma figura, como o espaço do piso que um tapete cobre."],"área"],
+["MAT","Número primo",["Sou um tipo de número natural.","Tenho exatamente dois divisores: o 1 e eu mesmo.","2, 3, 5, 7 e 11 são exemplos de mim."],"número primo; primo; números primos"],
+["MAT","Metade",["Sou uma parte de um inteiro.","Sou o mesmo que 50%.","Se você dividir algo em 2 partes iguais, cada parte sou eu."],"metade; meio; 1/2; 0,5"],
+["MAT","Quilograma",["Sou uma unidade de medida.","Meço massa e valho 1.000 gramas.","Meu símbolo é kg, como no pacote de arroz."],"quilograma; quilo; kg"],
+["MAT","Litro",["Sou uma unidade de medida de capacidade.","Valho 1.000 mililitros.","Meu símbolo é L, como na garrafa de refrigerante."],"litro; L"],
+["MAT","Ângulo reto",["Sou um tipo de ângulo.","Meço exatamente 90°.","Estou nos cantos de um quadrado e de uma folha de caderno."],"ângulo reto; ângulo de 90°"],
+["MAT","Número par",["Sou um tipo de número natural.","Sou divisível por 2.","Termino sempre em 0, 2, 4, 6 ou 8."],"número par; par; números pares"],
+["MAT","Vértice",["Sou um elemento dos polígonos e dos sólidos geométricos.","Sou o ponto onde dois lados de um polígono se encontram.","Um triângulo tem 3 de mim, e um quadrado tem 4."],"vértice; vértices"],
+["MAT","Porcentagem",["Sou uma razão com denominador 100.","Apareço muito em descontos de lojas e em notícias.","Meu símbolo é %."],"porcentagem; percentual; por cento"],
+
+// ===== CIÊNCIAS =====
+["CIE","Célula",["Sou muito pequena e quase sempre só posso ser vista ao microscópio.","Todos os seres vivos são formados por mim.","Sou a unidade básica da vida."],"célula"],
+["CIE","Membrana plasmática",["Faço parte da célula.","Envolvo a célula por fora.","Controlo o que entra e o que sai da célula, como uma portaria."],"membrana plasmática; membrana"],
+["CIE","Núcleo",["Faço parte de muitas células, como as dos animais.","Guardo o material genético, o DNA.","Sou o centro de comando da célula."],"núcleo"],
+["CIE","Citoplasma",["Faço parte da célula.","Fico entre a membrana e o núcleo.","Sou o material que preenche a célula, onde acontecem muitas reações."],"citoplasma"],
+["CIE","Tecido",["Sou um nível de organização do corpo.","Venho logo depois da célula.","Sou um conjunto de células parecidas que têm a mesma função."],"tecido"],
+["CIE","Órgão",["Sou um nível de organização do corpo.","Sou formado por tecidos.","Coração, estômago e pulmão são exemplos de mim."],"órgão; órgãos"],
+["CIE","Sistema",["Sou um nível de organização do corpo.","Sou formado por órgãos que trabalham juntos.","Digestório, respiratório e cardiovascular são exemplos de mim."],"sistema; sistema do corpo"],
+["CIE","Ser unicelular",["Sou um ser vivo.","Consigo me alimentar, crescer e me reproduzir sozinho.","Sou formado por uma única célula, como as bactérias."],"unicelular; ser unicelular"],
+["CIE","Fóssil",["Sou muito, muito antigo.","Posso ser um osso, uma concha ou até uma pegada.","Sou resto ou vestígio de um ser vivo preservado nas rochas."],"fóssil; fósseis"],
+["CIE","Rocha sedimentar",["Sou um tipo de rocha.","Me formo pelo acúmulo de camadas de sedimentos.","Sou a rocha onde os fósseis são mais encontrados."],"rocha sedimentar; sedimentar"],
+["CIE","Mistura homogênea",["Sou formada por dois ou mais materiais.","Tenho uma só fase: não dá para ver as partes separadas.","Água com açúcar bem dissolvido é um exemplo de mim."],"mistura homogênea; homogênea; solução"],
+["CIE","Mistura heterogênea",["Sou formada por dois ou mais materiais.","Dá para ver mais de uma fase em mim.","Água e óleo, ou água e areia, são exemplos de mim."],"mistura heterogênea; heterogênea"],
+["CIE","Filtração",["Sou um método de separação de misturas.","Separo um sólido não dissolvido de um líquido.","Aconteço quando você passa o café no coador."],"filtração; filtrar"],
+["CIE","Decantação",["Sou um método de separação de misturas.","Preciso de tempo: deixo a mistura parada.","O sólido mais pesado vai para o fundo e depois o líquido é separado com cuidado."],"decantação; decantar"],
+["CIE","Catação",["Sou um método de separação de misturas.","Sou feita com as mãos ou com uma pinça.","Sou usada para tirar as pedrinhas do feijão."],"catação; catar"],
+
+// ===== PORTUGUÊS =====
+["POR","Substantivo",["Sou uma classe de palavras.","Posso ser próprio ou comum.","Dou nome a seres, objetos, lugares e sentimentos."],"substantivo"],
+["POR","Substantivo próprio",["Sou um tipo de substantivo.","Dou nome a um ser específico, único.","Começo sempre com letra maiúscula, como Amparo e Maria."],"substantivo próprio"],
+["POR","Substantivo comum",["Sou um tipo de substantivo.","Dou nome a qualquer ser de uma mesma espécie, sem especificar qual.","Cidade, menina e cachorro são exemplos de mim."],"substantivo comum"],
+["POR","Adjetivo",["Sou uma classe de palavras.","Costumo acompanhar o substantivo.","Dou características: bonito, alto, delicioso."],"adjetivo"],
+["POR","Verbo",["Sou uma classe de palavras.","Mudo conforme o tempo: passado, presente e futuro.","Indico ação, estado ou fenômeno da natureza: correr, ser, chover."],"verbo"],
+["POR","Pronome pessoal",["Sou um tipo de pronome.","Indico quem fala, com quem se fala e de quem se fala.","Eu, tu, ele, nós, vós, eles."],"pronome pessoal"],
+["POR","Pronome possessivo",["Sou um tipo de pronome.","Indico a quem algo pertence.","Meu, teu, seu, nosso."],"pronome possessivo"],
+["POR","Pronome demonstrativo",["Sou um tipo de pronome.","Indico a posição de algo em relação a quem fala.","Este, esse, aquele."],"pronome demonstrativo"],
+["POR","Advérbio de tempo",["Sou um tipo de advérbio.","Indico quando algo acontece.","Ontem, hoje, amanhã, cedo."],"advérbio de tempo"],
+["POR","Advérbio de lugar",["Sou um tipo de advérbio.","Indico onde algo acontece.","Aqui, ali, lá, longe, perto."],"advérbio de lugar"],
+["POR","Advérbio de modo",["Sou um tipo de advérbio.","Indico como algo acontece.","Bem, mal, rapidamente, devagar."],"advérbio de modo"],
+["POR","Advérbio de intensidade",["Sou um tipo de advérbio.","Aumento ou diminuo a força de outras palavras.","Muito, pouco, bastante, tão."],"advérbio de intensidade"],
+["POR","Numeral cardinal",["Sou um tipo de numeral.","Indico uma quantidade exata.","Um, dois, três, dez, cem."],"numeral cardinal"],
+["POR","Numeral ordinal",["Sou um tipo de numeral.","Indico ordem ou posição.","Primeiro, segundo, terceiro."],"numeral ordinal"],
+["POR","Numeral multiplicativo",["Sou um tipo de numeral.","Indico que uma quantidade foi multiplicada.","Dobro, triplo, quádruplo."],"numeral multiplicativo"]
+];
+const CARTAS=CARTAS_RAW.map((r,i)=>({id:i,m:r[0],resp:r[1],dicas:r[2],aceitas:r[3]}));
+// Próxima carta: alterna matérias (MAT → CIE → POR), sorteia entre as não usadas; nunca repete (null se acabou).
+function proximaCarta(cartas,usadas,ultimaMat,rnd){
+  rnd=rnd||Math.random;
+  const ordem=["MAT","CIE","POR"];const ini=(ordem.indexOf(ultimaMat)+1)%3;
+  for(let k=0;k<3;k++){const m=ordem[(ini+k)%3];const l=cartas.filter(c=>c.m===m&&!usadas.has(c.id));if(l.length)return l[Math.floor(rnd()*l.length)]}
+  return null;
+}
+if(typeof module!=="undefined")module.exports={CARTAS,proximaCarta};
+
+</script>
+<script>
+const KEY="trilhaEnigmas6ano.v1";
+const META=20;
+const ESPECIAIS={4:"bonus",13:"bonus",8:"buraco",17:"buraco",6:"surpresa",11:"surpresa",15:"surpresa"};
+const ESP_INFO={bonus:["⭐","+2"],buraco:["🕳️","−2"],surpresa:["🃏","carta"]};
+const CORES=["var(--sA)","var(--sB)","var(--sC)","var(--sD)"];
+const MAT_NOME={MAT:"Matemática",CIE:"Ciências",POR:"Português"};
+const PODERES={
+  TURBO:{ic:"⚡",nome:"Turbo",txt:"Avança 2 casas na hora.",ativo:true},
+  TROCA:{ic:"🔄",nome:"Troca",txt:"Troca de lugar com uma sala que está à frente.",ativo:true},
+  ESCUDO:{ic:"🛡️",nome:"Escudo",txt:"Protege a sala da próxima Troca ou do próximo Buraco. Funciona sozinho.",ativo:false},
+  SEGUNDA:{ic:"🔁",nome:"Segunda chance",txt:"Quando a sala errar, pode responder de novo. Funciona sozinho.",ativo:false}
+};
+const MAX_MAO=3;
+const $=s=>document.querySelector(s);
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- estado salvo neste navegador ---------- */
+const novoEstado=(nomes,usadas,duracao)=>({
+  salas:(nomes||["6º A","6º B","6º C","6º D"]).map(n=>({nome:n,pos:0,mao:[]})),
+  usadas:usadas||[],ultimaMat:"POR",duracao:duracao||40,restante:(duracao||40)*60,pausado:true,
+  fase:"inicio",carta:null,dica:0,fora:[],vencedora:null,acertou:null,tempoAcabou:false,n:0});
+let E=novoEstado();
+try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.salas)&&s.salas.length===4)E=Object.assign(novoEstado(),s)}catch(e){}
+function salvar(){try{localStorage.setItem(KEY,JSON.stringify(E))}catch(e){}}
+const cartaAtual=()=>E.carta==null?null:CARTAS[E.carta];
+
+/* ---------- gabarito do professor (outra guia) ---------- */
+if(location.hash==="#professor"){
+  $("#app").hidden=true;$("#profView").hidden=false;document.body.style.overflow="auto";
+  const pintar=()=>{
+    try{const s=JSON.parse(localStorage.getItem(KEY));if(s)E=Object.assign(novoEstado(),s)}catch(e){}
+    const c=cartaAtual();
+    $("#profView").innerHTML=`<div class="aviso">🔒 Gabarito do professor: NÃO compartilhe esta guia no Meet.</div>
+      ${c?`<div class="box"><span class="tag ${c.m}" style="align-self:flex-start">${MAT_NOME[c.m]}</span><p>Carta ${E.n} · resposta:</p><h2>${esc(c.resp)}</h2>
+      <p>Aceite também: ${esc(c.aceitas)}</p><ol>${c.dicas.map(d=>`<li>${esc(d)}</li>`).join("")}</ol></div>`:`<div class="box"><p>Nenhuma carta na mesa ainda. Esta guia se atualiza sozinha.</p></div>`}`;
+  };
+  pintar();addEventListener("storage",pintar);setInterval(pintar,1500);
+}
+
+/* ---------- som ---------- */
+let som=true,ctx=null;
+function tom(f,d,tipo="triangle",v=.14,at=0){if(!som)return;try{ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();const t=ctx.currentTime+at,o=ctx.createOscillator(),g=ctx.createGain();o.type=tipo;o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g).connect(ctx.destination);o.start(t);o.stop(t+d)}catch(e){}}
+const SFX={passo:()=>tom(660,.08,"square",.06),certo:()=>[523,659,784].forEach((f,k)=>tom(f,.3,"triangle",.16,k*.1)),erro:()=>{tom(200,.4,"sawtooth",.1);tom(150,.5,"sawtooth",.1,.2)},
+  dica:()=>tom(440,.15,"sine",.12),poder:()=>[700,900,1200].forEach((f,k)=>tom(f,.18,"square",.07,k*.07)),buraco:()=>[400,300,200].forEach((f,k)=>tom(f,.2,"sawtooth",.08,k*.12)),
+  vitoria:()=>[523,659,784,1047,784,1047,1319].forEach((f,k)=>tom(f,.4,"triangle",.18,k*.15))};
+
+/* ---------- desenho ---------- */
+function celula(i){const r=Math.floor(i/7),k=i%7;return {row:r+1,col:(r%2===0?k:6-k)+1}}
+function desenharTabuleiro(){
+  let h="";
+  for(let i=0;i<=META;i++){
+    const p=celula(i),esp=ESPECIAIS[i];
+    const cls=["casa",esp||"",i===0?"start":"",i===META?"end":""].join(" ");
+    const rot=i===0?"LARGADA":i===META?"🏁 CHEGADA":i;
+    const peoes=E.salas.map((s,k)=>s.pos===i?`<span class="peao" id="peao${k}" style="background:${CORES[k]}" title="${esc(s.nome)}"></span>`:"").join("");
+    h+=`<div class="${cls}" style="grid-row:${p.row};grid-column:${p.col}"><span class="num">${rot}</span>${esp?`<span class="esp">${ESP_INFO[esp][0]}</span>`:""}
+      <div class="peoes">${peoes}</div>${esp?`<span class="tip">${ESP_INFO[esp][1]}</span>`:""}</div>`;
+  }
+  $("#track").innerHTML=h;
+}
+function desenharSalas(){
+  const ativa=E.fase==="carta";
+  $("#salas").innerHTML=E.salas.map((s,k)=>{
+    const fora=E.fora.includes(k);
+    const mao=s.mao.length?s.mao.map((p,j)=>{const P=PODERES[p];return `<button class="poder ${P.ativo?"":"passivo"}" data-s="${k}" data-j="${j}" title="${P.txt}">${P.ic} ${P.nome}</button>`}).join(""):`<span class="vazio">Sem cartas de poder</span>`;
+    return `<div class="sala ${ativa&&fora?"fora":""} ${E.acertou===k?"vez":""}" style="--c:${CORES[k]}">
+      <div class="shead"><span class="peao"></span><b>${esc(s.nome)}</b><span>Casa ${s.pos}</span></div>
+      <div class="sact"><button class="ok" data-ok="${k}" ${!ativa||fora?"disabled":""}>✔ Acertou</button><button class="no" data-no="${k}" ${!ativa||fora?"disabled":""}>✖ Errou</button></div>
+      <div class="mao">${mao}</div></div>`}).join("");
+  $("#salas").querySelectorAll("[data-ok]").forEach(b=>b.onclick=()=>acertou(+b.dataset.ok));
+  $("#salas").querySelectorAll("[data-no]").forEach(b=>b.onclick=()=>errou(+b.dataset.no));
+  $("#salas").querySelectorAll(".poder").forEach(b=>b.onclick=()=>usarPoder(+b.dataset.s,+b.dataset.j));
+}
+function valor(d){return 4-d}
+function desenharCarta(){
+  const el=$("#enigma");const c=cartaAtual();
+  if(E.fase==="inicio"||!c){
+    el.className="enigma";
+    const livres=CARTAS.length-E.usadas.length;
+    el.innerHTML=`<div class="intro"><div class="etitle">QUEM SOU EU?</div>
+      <p>Cada carta traz 3 dicas. O porta-voz levanta a mão no Meet e responde no microfone. Acertou na 1ª dica: anda 3 casas e ganha uma carta de poder. Na 2ª: 2 casas. Na 3ª: 1 casa.</p>
+      <div class="ctrl"><button class="btn" id="btnPrimeira" ${livres?"":"disabled"}>▶ Começar: sortear a 1ª carta</button></div>
+      <span class="ecount">Cartas inéditas: ${livres} de ${CARTAS.length} · Tempo de jogo: ${E.duracao} min</span></div>`;
+    $("#btnPrimeira").onclick=()=>{E.pausado=false;novaCarta()};
+    return;
+  }
+  el.className="enigma "+c.m;
+  let dicas="";
+  for(let d=1;d<=3;d++){
+    if(d<=E.dica||E.fase!=="carta")dicas+=`<div class="dica"><span class="nd">${d}ª<small>vale ${valor(d)}</small></span><span>${esc(c.dicas[d-1])}</span></div>`;
+    else dicas+=`<div class="dica lock"><span class="nd">${d}ª<small>vale ${valor(d)}</small></span><span>Dica ${d} escondida</span></div>`;
+  }
+  let ctrl="",resp="";
+  if(E.fase==="carta"){
+    ctrl=`<button class="btn dark" id="btnDica" ${E.dica>=3?"disabled":""}>👁 Mostrar ${E.dica+1<=3?(E.dica+1)+"ª dica":"dica"}</button>
+      <button class="btn ghost" id="btnNinguem">Ninguém acertou: revelar</button>`;
+  }else{
+    const quem=E.acertou!=null?`${esc(E.salas[E.acertou].nome)} acertou!`:"Ninguém acertou";
+    resp=`<div class="resp"><small>${quem}</small>${esc(c.resp)}</div>`;
+    ctrl=E.vencedora!=null||E.tempoAcabou?`<button class="btn" id="btnFinal">🏆 Ver resultado final</button>`:`<button class="btn" id="btnProx">Próxima carta ▶</button>`;
+  }
+  el.innerHTML=`<div class="ehead"><div class="etitle">QUEM SOU EU?</div><span class="tag ${c.m}">${MAT_NOME[c.m]}</span><span class="ecount">Carta ${E.n}</span></div>
+    <div class="dicas">${dicas}</div>${resp}<div class="ctrl">${ctrl}</div>`;
+  const b1=$("#btnDica");if(b1)b1.onclick=proxDica;
+  const b2=$("#btnNinguem");if(b2)b2.onclick=()=>revelar(null);
+  const b3=$("#btnProx");if(b3)b3.onclick=novaCarta;
+  const b4=$("#btnFinal");if(b4)b4.onclick=resultado;
+}
+function tudo(){desenharTabuleiro();desenharSalas();desenharCarta();desenharRelogio();salvar()}
+
+/* ---------- fluxo da carta ---------- */
+function novaCarta(){
+  const c=proximaCarta(CARTAS,new Set(E.usadas),E.ultimaMat);
+  if(!c){toast("Acabaram as cartas inéditas!");resultado();return}
+  E.usadas.push(c.id);E.ultimaMat=c.m;E.carta=c.id;E.dica=1;E.fora=[];E.acertou=null;E.fase="carta";E.n++;
+  SFX.dica();tudo();
+}
+function proxDica(){if(E.fase!=="carta"||E.dica>=3)return;E.dica++;SFX.dica();tudo()}
+function errou(k){
+  if(E.fase!=="carta"||E.fora.includes(k))return;
+  const s=E.salas[k],j=s.mao.indexOf("SEGUNDA");
+  if(j>=0){
+    modal(`<div class="bigicon">🔁</div><h2>${esc(s.nome)} tem Segunda chance!</h2><p>Usar agora e responder de novo?</p>`,
+      [["Usar Segunda chance",()=>{s.mao.splice(j,1);fechar();SFX.poder();toast(`${s.nome} usou a Segunda chance: pode responder de novo!`);tudo()}],
+       ["Não usar",()=>{fechar();marcarFora(k)},"ghost"]]);
+  }else marcarFora(k);
+}
+function marcarFora(k){
+  E.fora.push(k);SFX.erro();
+  if(E.fora.length>=4){revelar(null);return}
+  tudo();
+}
+async function acertou(k){
+  if(E.fase!=="carta")return;
+  const pts=valor(E.dica),primeira=E.dica===1;
+  revelar(k);SFX.certo();confete(900);
+  await mover(k,pts);
+  if(primeira&&E.vencedora==null)ganharPoder(k,"acertou na 1ª dica");
+}
+function revelar(k){E.fase="revelada";E.acertou=k;if(k==null)SFX.erro();tudo()}
+
+/* ---------- movimento e casas especiais ---------- */
+const espera=ms=>new Promise(r=>setTimeout(r,ms));
+let movendo=false;
+async function mover(k,n,especial=true){
+  movendo=true;const s=E.salas[k];const dir=n>0?1:-1;
+  for(let i=0;i<Math.abs(n);i++){
+    s.pos=Math.max(0,Math.min(META,s.pos+dir));desenharTabuleiro();const p=$("#peao"+k);if(p)p.classList.add("hop");SFX.passo();await espera(300);
+    if(s.pos===META)break;
+  }
+  desenharSalas();salvar();
+  if(s.pos>=META){movendo=false;vitoria(k);return}
+  const esp=ESPECIAIS[s.pos];
+  if(especial&&esp){
+    await espera(250);
+    if(esp==="bonus"){toast(`⭐ Casa bônus! ${s.nome} avança mais 2.`);SFX.poder();await mover(k,2,false)}
+    else if(esp==="buraco"){
+      const j=s.mao.indexOf("ESCUDO");
+      if(j>=0){s.mao.splice(j,1);toast(`🛡️ ${s.nome} usou o Escudo e escapou do buraco!`);SFX.poder()}
+      else{toast(`🕳️ Buraco! ${s.nome} volta 2 casas.`);SFX.buraco();await mover(k,-2,false)}
+    }else if(esp==="surpresa")ganharPoder(k,"caiu na casa surpresa");
+  }
+  movendo=false;tudo();
+}
+function ganharPoder(k,motivo){
+  const s=E.salas[k];
+  if(s.mao.length>=MAX_MAO){toast(`${s.nome} já tem ${MAX_MAO} cartas de poder: mão cheia!`);return}
+  const tipos=Object.keys(PODERES);const p=tipos[Math.floor(Math.random()*tipos.length)];s.mao.push(p);SFX.poder();tudo();
+  const P=PODERES[p];
+  modal(`<div class="bigicon">${P.ic}</div><h2>${esc(s.nome)} ganhou: ${P.nome}!</h2><p>${P.txt}</p><p style="opacity:.7;font-size:.8em">(${motivo})</p>`,[["Legal!",fechar]]);
+}
+function usarPoder(k,j){
+  if(movendo||E.vencedora!=null)return;
+  const s=E.salas[k],p=s.mao[j],P=PODERES[p];
+  if(!P.ativo){toast(`${P.ic} ${P.nome}: ${P.txt}`);return}
+  if(p==="TURBO"){
+    modal(`<div class="bigicon">⚡</div><h2>${esc(s.nome)}: usar o Turbo?</h2><p>Avança 2 casas agora.</p>`,
+      [["Usar Turbo",async()=>{fechar();s.mao.splice(j,1);SFX.poder();await mover(k,2)}],["Agora não",fechar,"ghost"]]);
+  }else if(p==="TROCA"){
+    const alvos=E.salas.map((x,i)=>({x,i})).filter(o=>o.i!==k&&o.x.pos>s.pos);
+    if(!alvos.length){toast("🔄 Nenhuma sala está à frente para trocar de lugar.");return}
+    modal(`<div class="bigicon">🔄</div><h2>${esc(s.nome)}: trocar de lugar com quem?</h2><p>Escolha uma sala que está à frente.</p>
+      <div class="alvos">${alvos.map(o=>`<button class="alvo" data-a="${o.i}" style="--c:${CORES[o.i]}">${esc(o.x.nome)} · casa ${o.x.pos}</button>`).join("")}</div>`,
+      [["Cancelar",fechar,"ghost"]]);
+    document.querySelectorAll(".alvo").forEach(b=>b.onclick=()=>{
+      const a=+b.dataset.a,t=E.salas[a];s.mao.splice(j,1);fechar();
+      const e=t.mao.indexOf("ESCUDO");
+      if(e>=0){t.mao.splice(e,1);SFX.poder();toast(`🛡️ ${t.nome} tinha Escudo! A troca foi bloqueada.`)}
+      else{const tmp=s.pos;s.pos=t.pos;t.pos=tmp;SFX.poder();toast(`🔄 ${s.nome} e ${t.nome} trocaram de lugar!`)}
+      tudo();
+    });
+  }
+}
+
+/* ---------- fim ---------- */
+function vitoria(k){E.vencedora=k;E.pausado=true;salvar();SFX.vitoria();confete(6000);tudo();
+  modal(`<div class="bigicon">🏁</div><h2>${esc(E.salas[k].nome)} chegou primeiro!</h2><p>Fim de jogo: temos a sala campeã da Trilha dos Enigmas!</p>`,[["🏆 Ver resultado final",resultado]]);}
+function resultado(){
+  E.pausado=true;E.fase=E.fase==="inicio"?"inicio":"revelada";salvar();
+  const nota=o=>o.s.pos+(o.k===E.vencedora?100:0);
+  const ordem=E.salas.map((s,k)=>({s,k})).sort((a,b)=>nota(b)-nota(a));
+  ordem.forEach(o=>o.rank=1+ordem.filter(x=>nota(x)>nota(o)).length);
+  const lider=ordem[0];const empate=ordem.filter(o=>o.rank===1).length>1;
+  SFX.vitoria();confete(5000);
+  modal(`<h2>${empate?"Empate na liderança!":"👑 "+esc(lider.s.nome)+" é a campeã!"}</h2>
+    <div class="rank">${ordem.map((o,i)=>`<div class="rrow" style="--c:${CORES[o.k]}"><span class="pos">${o.rank}º</span><span class="peao"></span><span>${esc(o.s.nome)}</span><span>casa ${o.s.pos}</span></div>`).join("")}</div>`,
+    [["Fechar",fechar,"ghost"]]);
+}
+
+/* ---------- relógio ---------- */
+function fmtT(s){s=Math.max(0,s);return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}
+function desenharRelogio(){const r=$("#relogio");r.textContent=fmtT(E.restante);r.classList.toggle("low",E.restante<=120);$("#btnPausa").textContent=E.pausado?"▶ Continuar":"⏸ Pausar";$("#btnPausa").disabled=E.fase==="inicio"}
+setInterval(()=>{
+  if(location.hash==="#professor"||E.pausado||E.fase==="inicio"||E.vencedora!=null||E.tempoAcabou)return;
+  E.restante--;
+  if(E.restante<=0){E.restante=0;E.tempoAcabou=true;SFX.buraco();toast("⏰ Acabou o tempo! Terminem esta carta e vejam o resultado.");desenharCarta()}
+  desenharRelogio();if(E.restante%5===0)salvar();
+},1000);
+$("#btnPausa").onclick=()=>{E.pausado=!E.pausado;tudo()};
+
+/* ---------- ferramentas ---------- */
+$("#btnSom").onclick=e=>{som=!som;e.currentTarget.textContent=som?"🔊 Som":"🔇 Mudo";e.currentTarget.setAttribute("aria-pressed",som)};
+$("#btnTela").onclick=()=>{try{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen().catch(()=>{})}catch(e){}};
+$("#btnCfg").onclick=()=>{
+  let dur=E.duracao;
+  modal(`<h2>Ajustes</h2><div class="cfg">
+    <fieldset><legend>Nomes das salas</legend>${E.salas.map((s,k)=>`<input id="nm${k}" value="${esc(s.nome)}" maxlength="14" aria-label="Nome da sala ${k+1}">`).join("")}</fieldset>
+    <fieldset><legend>Tempo de jogo (vale para a próxima partida)</legend>${[30,40,50].map(v=>`<button class="small" data-d="${v}" aria-pressed="${v===dur}">${v} min</button>`).join("")}</fieldset>
+    <fieldset><legend>Cartas</legend><span class="note">Inéditas: ${CARTAS.length-E.usadas.length} de ${CARTAS.length}. Jogue sempre neste mesmo computador e navegador, sem aba anônima: é aqui que o jogo guarda o que já saiu.</span></fieldset>
+    <fieldset><legend>Recomeçar</legend><button class="small" id="novaPartida">Nova partida (cartas usadas continuam bloqueadas)</button>
+      <button class="small danger" id="zerar">Zerar tudo (libera as ${CARTAS.length} cartas)</button><span class="note" id="zn">Peças voltam à largada, as cartas de poder somem e o relógio reinicia.</span></fieldset></div>`,
+    [["Salvar",()=>{E.salas.forEach((s,k)=>{const v=$("#nm"+k).value.trim();if(v)s.nome=v});E.duracao=dur;if(E.fase==="inicio")E.restante=dur*60;fechar();tudo()}],["Cancelar",fechar,"ghost"]]);
+  document.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{dur=+b.dataset.d;document.querySelectorAll("[data-d]").forEach(x=>x.setAttribute("aria-pressed",x===b))});
+  const nomes=()=>E.salas.map((s,k)=>($("#nm"+k).value.trim()||s.nome));
+  let c1=false,c2=false;
+  $("#novaPartida").onclick=e=>{if(!c1){c1=true;e.currentTarget.textContent="Toque de novo para confirmar";return}E=novoEstado(nomes(),E.usadas,dur);fechar();tudo()};
+  $("#zerar").onclick=e=>{if(!c2){c2=true;e.currentTarget.textContent="Toque de novo para confirmar";$("#zn").textContent="Isso libera todas as cartas, inclusive as que já saíram.";return}E=novoEstado(nomes(),[],dur);fechar();tudo()};
+};
+
+/* ---------- modal, toast, confete ---------- */
+function modal(html,botoes){
+  const o=$("#overlay");o.innerHTML=`<div class="overlay"><div class="modal" role="dialog" aria-modal="true">${html}<div class="actions"></div></div></div>`;
+  const a=o.querySelector(".actions");
+  botoes.forEach(([t,fn,cls])=>{const b=document.createElement("button");b.className="btn"+(cls?" "+cls:"");b.textContent=t;b.onclick=fn;a.appendChild(b)});
+  const f=o.querySelector(".modal button");if(f)f.focus();
+}
+function fechar(){$("#overlay").innerHTML=""}
+let tt=null;function toast(t){$("#toastBox").innerHTML=`<div class="toast" role="status">${esc(t)}</div>`;clearTimeout(tt);tt=setTimeout(()=>$("#toastBox").innerHTML="",3200)}
+const cv=$("#confetti"),cx=cv.getContext("2d");let pecas=[],ate=0,raf=null;
+function confete(ms){if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;cv.width=innerWidth;cv.height=innerHeight;ate=Math.max(ate,performance.now()+ms);soltar();if(!raf)raf=requestAnimationFrame(loop)}
+function soltar(){const c=["#ff5d5d","#4d8dff","#ffc93c","#3ccf7a","#fbf3dc"];for(let i=0;i<120;i++)pecas.push({x:Math.random()*cv.width,y:-20-Math.random()*cv.height*.4,vx:(Math.random()-.5)*3,vy:2+Math.random()*4,r:Math.random()*6,vr:(Math.random()-.5)*.3,w:6+Math.random()*8,h:4+Math.random()*6,c:c[i%5]})}
+function loop(t){cx.clearRect(0,0,cv.width,cv.height);pecas.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;cx.save();cx.translate(p.x,p.y);cx.rotate(p.r);cx.fillStyle=p.c;cx.fillRect(-p.w/2,-p.h/2,p.w,p.h);cx.restore()});pecas=pecas.filter(p=>p.y<cv.height+20);if(t<ate&&pecas.length<40)soltar();if(pecas.length)raf=requestAnimationFrame(loop);else{raf=null;cx.clearRect(0,0,cv.width,cv.height)}}
+
+if(location.hash!=="#professor"){
+  // ao recarregar no meio de uma jogada, o relógio fica pausado por segurança
+  if(E.fase!=="inicio")E.pausado=true;
+  tudo();
+}
+</script>
+
+</body>
+</html>
